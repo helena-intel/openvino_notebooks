@@ -1,0 +1,6 @@
+python .ci/patch_notebooks.py
+jupyter nbconvert --execute --to notebook notebooks/201-vision-monodepth/test_201-vision-monodepth.ipynb 
+jupyter nbconvert --execute --to notebook notebooks/205-vision-background-removal/test_205-vision-background-removal.ipynb
+jupyter nbconvert --execute --to notebook notebooks/206-vision-paddlegan-anime/test_206-vision-paddlegan-anime.ipynb
+jupyter nbconvert --execute --to notebook notebooks/207-vision-paddlegan-superresolution/test_207-vision-paddlegan-superresolution.ipynb
+
