@@ -1,4 +1,4 @@
-openvino-dev[onnx,tensorflow2]==2021.4.2
+openvino-dev[onnx,tensorflow2]==2022.1.0.dev20220131
 gdown
 pytube
 yaspin
