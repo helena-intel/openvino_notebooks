@@ -1,4 +1,6 @@
-openvino-dev[onnx,tensorflow2]==2022.1.0.dev20220131
+-i https://test.pypi.org/simple/ 
+--extra-index-url  https://pypi.org/simple/
+openvino-dev[onnx,tensorflow2]==2022.1.0.dev20220207
 gdown
 pytube
 yaspin
@@ -25,8 +27,8 @@ ppgan==2.1.*
 transformers
 
 # NNCF notebook requirements
-nncf[tf, torch]
-tensorflow_datasets==4.2.0
+# nncf[tf, torch]
+# tensorflow_datasets==4.2.0
 
 # CT scan training/inference requirements
 monai
