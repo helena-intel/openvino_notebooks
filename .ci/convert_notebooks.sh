@@ -5,9 +5,12 @@ rstdir=$PWD"/rst_files"
 binderlist=$rstdir"/notebooks_with_buttons.txt"
 htmldir=$PWD"/html_files"
 markdowndir=$PWD"/markdown_files"
+pydir=$PWD"/python_files"
+
 mkdir -p $rstdir
 mkdir -p $htmldir
 mkdir -p $markdowndir
+mkdir -p $pydir
 
 # List all notebooks that contain binder buttons based on readme
 cat README.md | grep -E ".*mybinder.*[0-9]{3}.*" | cut -f1 -d] | cut -f2 -d[ > $binderlist
@@ -16,6 +19,7 @@ git ls-files "*.ipynb" | while read notebook; do
     executed_notebook=${notebook/.ipynb/-with-output.ipynb}
     echo $executed_notebook
     jupyter nbconvert --log-level=INFO --execute --to notebook --output $executed_notebook --output-dir . --ExecutePreprocessor.kernel_name="python3" $notebook
+    jupyter nbconvert --to script $executed_notebook --output-dir $pydir --TagRemovePreprocessor.remove_all_outputs_tags=hide_output --TagRemovePreprocessor.enabled=True 
     jupyter nbconvert --to markdown $executed_notebook --output-dir $markdowndir --TagRemovePreprocessor.remove_all_outputs_tags=hide_output --TagRemovePreprocessor.enabled=True 
     jupyter nbconvert --to html $executed_notebook --output-dir $htmldir --TagRemovePreprocessor.remove_all_outputs_tags=hide_output --TagRemovePreprocessor.enabled=True 
     jupyter nbconvert --to rst $executed_notebook --output-dir $rstdir --TagRemovePreprocessor.remove_all_outputs_tags=hide_output --TagRemovePreprocessor.enabled=True 

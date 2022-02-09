@@ -106,4 +106,9 @@ jobs:
       with:
         name: rst_files
         path: rst_files
+    - name: Save Python files
+      uses: actions/upload-artifact@v2
+      with:
+        name: python_files
+        path: python_files
 
