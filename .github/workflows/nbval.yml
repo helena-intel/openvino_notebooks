@@ -132,5 +132,7 @@ jobs:
         jupyter lab notebooks --help
     - name: Analysing with nbval
       run: |
-        python -m pytest --nbval -x -k "test_ or notebook_utils" --durations 10
-
+        python -m pytest --nbval -x -k "test_103 or test_207" --durations 10
+    - name: Show paddle cache
+      run: |
+        python -c "import os;print(os.listdir('/tmp/paddlehub'))"
