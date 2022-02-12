@@ -83,17 +83,27 @@ jobs:
       shell: bash
       run: | 
         python -c 'import os;print("CACHE_DIR={0}".format(os.path.expanduser(os.path.join("~", ".cache"))))'
-        python -c 'import os;print("CACHE_DIR={0}".format(os.path.expanduser(os.path.join("~", ".cache"))))' >> $GITHUB_ENV
+        python -c 'import os;print("CACHE_DIR={0}".format(os.path.expanduser(os.path.join("~", ".cache"))))' | sed -e 's/\\/\//g' >> $GITHUB_ENV
     - name: Set HUB_HOME
       shell: bash
       run: | 
-        echo HUB_HOME=${{ env.CACHE_DIR }} >> $GITHUB_ENV
+        echo HUB_HOME=${{ env.CACHE_DIR }}/.paddlehub >> $GITHUB_ENV
+    - name: Create HUB_HOME
+      shell: python
+      run: |
+        from pathlib import Path
+        import os
+        hub_home = os.environ['HUB_HOME']
+        print(hub_home)
+        Path(hub_home).mkdir(exist_ok=True, parents=True)
     - name: Cache user cache and HUB_HOME directory (per OS)  # includes PaddlePaddle and PaddleGAN caches
       id: cacheusercache
       uses: actions/cache@v2
       with:
         path: |
-          ${{ env.CACHE_DIR }}  # set in step above
+          ${{ env.CACHE_DIR }}/.paddlehub
+          ${{ env.CACHE_DIR }}/paddle
+          ${{ env.CACHE_DIR }}/ppgan
         key: ${{ env.USER_CACHE_KEY }}-${{ matrix.os }}
     - name: Cache openvino packages
       if: steps.cachepip.outputs.cache-hit != 'true'
@@ -152,7 +162,7 @@ jobs:
         HUB_HOME: ${{ env.HUB_HOME}}
     - name: Show cache
       run: |
-        ls -lR ${{ env.CACHE_DIR }}
+        ls -laR ${{ env.CACHE_DIR }}
         du -sh ${{ env.CACHE_DIR }}
-      if: runner.os == 'Linux'
+      if: runner.os != 'Windows'
 
