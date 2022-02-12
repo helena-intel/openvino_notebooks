@@ -53,13 +53,6 @@ jobs:
             sudo apt-get install libsndfile1 -y
             fi
       shell: bash
-    - name: Cache OpenVINO Pip Packages
-      id: cachepip
-      uses: actions/cache@v2
-      with:
-        path: |
-          pipcache
-        key: ${{ env.PIP_CACHE_KEY }}-${{ matrix.os }}-${{ matrix.python }}
     - name: Cache Files
       id: cachefiles
       uses: actions/cache@v2
@@ -78,14 +71,6 @@ jobs:
           notebooks/212-onnx-style-transfer/model
           notebooks/302-pytorch-quantization-aware-training/data/tiny-imagenet-200.zip
         key: ${{ env.FILES_CACHE_KEY }}-${{ matrix.os }}
-    - name: Cache openvino packages
-      if: steps.cachepip.outputs.cache-hit != 'true'
-      run: |
-        python -m pip install --upgrade pip==21.3.*
-        mkdir pipcache
-        python -m pip install --cache-dir pipcache --no-deps openvino openvino-dev nncf
-        cp -r pipcache pipcache_openvino
-        python -m pip uninstall -y openvino openvino-dev nncf
     - name: Download CT files
       if: steps.cachefiles.outputs.cache-hit != 'true'
       run: |
@@ -101,7 +86,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip==21.3.*
-        python -m pip install -r .ci/dev-requirements.txt --cache-dir pipcache
+        python -m pip install -r .ci/dev-requirements.txt
         python -m ipykernel install --user --name openvino_env
      
     - name: Find OpenVINO files
@@ -109,12 +94,6 @@ jobs:
          wget https://raw.githubusercontent.com/openvinotoolkit/openvino/e83b399866b356dde4d399c4252b3f9adeec90aa/tools/pot/openvino/tools/pot/engines/ie_engine.py
          cp ie_engine.py `find /opt/hostedtoolcache -name ie_engine.py -printf "%h\n"`
          ls -l `find /opt/hostedtoolcache -name ie_engine.py -printf "%h\n"`
-    - name: Make pipcache directory with OpenVINO packages
-      # Only cache OpenVINO packages. mv works cross-platform
-      if: steps.cachepip.outputs.cache-hit != 'true'
-      run: |
-        mv pipcache pipcache_full
-        mv pipcache_openvino pipcache
     - name: Pip freeze
       run: |
         python -m pip freeze
@@ -136,5 +115,6 @@ jobs:
         jupyter lab notebooks --help
     - name: Analysing with nbval
       run: |
+        opt_in_out --opt_out
         python -m pytest --nbval -x -k "test_105 or test_110 or test_111 or test_301 " --durations 10
 
