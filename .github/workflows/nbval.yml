@@ -36,8 +36,8 @@ jobs:
         os: [ubuntu-18.04, ubuntu-20.04, windows-2019, macos-10.15, macos-11]
         python: [3.6, 3.7, 3.8, 3.9]
         exclude:
-         - os: macos-11
-           python: 3.6
+        - os: macos-11
+          python: 3.6
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -70,7 +70,6 @@ jobs:
         path: |
           # NOTE: when modifying cache paths, update FILES_CACHE_KEY in .env
           # and change cache paths in convert_notebooks.yml as well
-          ${{ env.HUB_HOME }}
           case_00030.zip
           notebooks/110-ct-segmentation-quantize/kits19_frames_1
           notebooks/112-pytorch-post-training-quantization-nncf/output/tiny-imagenet-200.zip
@@ -80,6 +79,32 @@ jobs:
           notebooks/212-onnx-style-transfer/model
           notebooks/302-pytorch-quantization-aware-training/data/tiny-imagenet-200.zip
         key: ${{ env.FILES_CACHE_KEY }}
+    - name: Set CACHE_DIR
+      shell: bash
+      run: | 
+        python -c 'import os;print("CACHE_DIR={0}".format(os.path.expanduser(os.path.join("~", ".cache"))))'
+        python -c 'import os;print("CACHE_DIR={0}".format(os.path.expanduser(os.path.join("~", ".cache"))))' | sed -e 's/\\/\//g' >> $GITHUB_ENV
+    - name: Set HUB_HOME
+      shell: bash
+      run: | 
+        echo HUB_HOME=${{ env.CACHE_DIR }}/.paddlehub >> $GITHUB_ENV
+    - name: Create HUB_HOME
+      shell: python
+      run: |
+        from pathlib import Path
+        import os
+        hub_home = os.environ['HUB_HOME']
+        print(hub_home)
+        Path(hub_home).mkdir(exist_ok=True, parents=True)
+    - name: Cache user cache and HUB_HOME directory (per OS)  # includes PaddlePaddle and PaddleGAN caches
+      id: cacheusercache
+      uses: actions/cache@v2
+      with:
+        path: |
+          ${{ env.CACHE_DIR }}/.paddlehub
+          ${{ env.CACHE_DIR }}/paddle
+          ${{ env.CACHE_DIR }}/ppgan
+        key: ${{ env.USER_CACHE_KEY }}-${{ matrix.os }}
     - name: Cache openvino packages
       if: steps.cachepip.outputs.cache-hit != 'true'
       run: |
@@ -105,7 +130,6 @@ jobs:
         python -m pip install --upgrade pip==21.3.*
         python -m pip install -r .ci/dev-requirements.txt --cache-dir pipcache
         python -m ipykernel install --user --name openvino_env
-
     - name: Patch POT
       run: |
          wget https://raw.githubusercontent.com/openvinotoolkit/openvino/e83b399866b356dde4d399c4252b3f9adeec90aa/tools/pot/openvino/tools/pot/engines/ie_engine.py
