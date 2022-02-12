@@ -165,7 +165,11 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         python -m pytest --nbval -x -k "test_ or notebook_utils" --durations 10 --ignore=notebooks/112-pytorch-post-training-quantization-nncf --ignore=notebooks/302-pytorch-quantization-aware-training --ignore=notebooks/305-tensorflow-quantization-aware-training --ignore=notebooks/403-action-recognition-webcam
-    - name: Analysing with nbval (Windows/macOS, excluding POT)
-      if: runner.os != 'Linux'
+    - name: Analysing with nbval (Windows, excluding POT)
+      if: runner.os == 'Windows'
       run: |
         python -m pytest --nbval -x -k "test_ or notebook_utils" --durations 10 --ignore=notebooks/302-pytorch-quantization-aware-training --ignore=notebooks/112-pytorch-post-training-quantization-nncf --ignore=notebooks/305-tensorflow-quantization-aware-training --ignore=notebooks/105-language-quantize-bert --ignore=notebooks/111-detection-quantization --ignore=notebooks/301-tensorflow-training-openvino --ignore=notebooks/403-action-recognition-webcam
+    - name: Analysing with nbval (Windows, excluding POT and 206)
+      if: runner.os == 'macOS'
+      run: |
+        python -m pytest --nbval -x -k "test_ or notebook_utils" --durations 10 --ignore=notebooks/302-pytorch-quantization-aware-training --ignore=notebooks/112-pytorch-post-training-quantization-nncf --ignore=notebooks/305-tensorflow-quantization-aware-training --ignore=notebooks/105-language-quantize-bert --ignore=notebooks/111-detection-quantization --ignore=notebooks/301-tensorflow-training-openvino --ignore=notebooks/403-action-recognition-webcam --ignore=notebooks/206-vision-paddlegan-anime
