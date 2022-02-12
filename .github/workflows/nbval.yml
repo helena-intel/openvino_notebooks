@@ -79,17 +79,21 @@ jobs:
           notebooks/212-onnx-style-transfer/model
           notebooks/302-pytorch-quantization-aware-training/data/tiny-imagenet-200.zip
         key: ${{ env.FILES_CACHE_KEY }}
-    - name: Get user cache directory
+    - name: Set CACHE_DIR
       shell: bash
       run: | 
         python -c 'import os;print("CACHE_DIR={0}".format(os.path.expanduser(os.path.join("~", ".cache"))))'
         python -c 'import os;print("CACHE_DIR={0}".format(os.path.expanduser(os.path.join("~", ".cache"))))' >> $GITHUB_ENV
-    - name: Cache user cache directory (per OS)  # includes PaddlePaddle and PaddleGAN caches
+    - name: Set HUB_HOME
+      shell: bash
+      run: | 
+        echo HUB_HOME=${{ env.CACHE_DIR }} >> $GITHUB_ENV
+    - name: Cache user cache and HUB_HOME directory (per OS)  # includes PaddlePaddle and PaddleGAN caches
       id: cacheusercache
       uses: actions/cache@v2
       with:
         path: |
-          ${{ env.CACHE_DIR }}
+          ${{ env.CACHE_DIR }}  # set in step above
         key: ${{ env.USER_CACHE_KEY }}-${{ matrix.os }}
     - name: Cache openvino packages
       if: steps.cachepip.outputs.cache-hit != 'true'
@@ -144,6 +148,8 @@ jobs:
     - name: Analysing with nbval
       run: |
         python -m pytest --nbval -x -k "test_103 or test_206 or test_207 " --durations 10
+      env:
+        HUB_HOME: ${{ env.HUB_HOME}}
     - name: Show cache
       run: |
         ls -lR ${{ env.CACHE_DIR }}
