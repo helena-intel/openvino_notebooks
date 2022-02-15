@@ -34,10 +34,10 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-18.04, ubuntu-20.04, windows-2019, macos-10.15, macos-11]
-        python: [3.7,3.9]
-        #exclude:
-        #- os: macos-11
-        #  python: 3.6
+        python: [3.6,3.9]
+        exclude:
+        - os: macos-11
+          python: 3.6
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -129,7 +129,6 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install -r .ci/dev-requirements.txt --cache-dir pipcache
-        python -m pip install --upgrade numpy==1.22.*
         python -m ipykernel install --user --name openvino_env
     - name: Patch POT
       run: |
@@ -165,8 +164,7 @@ jobs:
     - name: Analyze notebooks with nbval
       run: |
         # python -m pytest --nbval -x -k "test_ or notebook_utils" --durations 10 --ignore=notebooks/112-pytorch-post-training-quantization-nncf --ignore=notebooks/302-pytorch-quantization-aware-training --ignore=notebooks/305-tensorflow-quantization-aware-training
-        python -m pytest --nbval -x -k "test_ or notebook_utils" --durations 10 --ignore=notebooks/305-tensorflow-quantization-aware-training --ignore=notebooks/403-action-recognition-webcam --ignore=notebooks/301-tensorflow-training-openvino 
-        
+        python -m pytest --nbval -x -k "test_ or notebook_utils" --durations 10 --ignore=notebooks/305-tensorflow-quantization-aware-training --ignore=notebooks/403-action-recognition-webcam
 
 #     - name: Analysing with nbval (Linux, including POT)
 #       if: runner.os == 'Linux'
