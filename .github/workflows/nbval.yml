@@ -143,6 +143,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip==21.3.*
         python -m pip install -r .ci/dev-requirements.txt --cache-dir pipcache
+        python -m pip install --upgrade numpy==1.22.*
         python -m ipykernel install --user --name openvino_env
 
       # Cache OpenVINO packages. mv works cross-platform
@@ -183,7 +184,7 @@ jobs:
     # Main notebooks test. Verifies that all notebooks run without errors
     - name: Analysing with nbval
       run: |
-        python -m pytest --nbval -x -k "test_ or notebook_utils" --durations 10
+        python -m pytest --nbval -k "test_ or notebook_utils" --durations 10
 
     # Show the cache after running the notebooks
     - name: Show cache
