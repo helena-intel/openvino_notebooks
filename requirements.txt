@@ -25,7 +25,7 @@ ppgan==2.1.*
 transformers
 
 # NNCF notebook requirements
-# nncf[torch]
+nncf[torch]
 # tensorflow_datasets==4.2.0
 
 # CT scan training/inference requirements
