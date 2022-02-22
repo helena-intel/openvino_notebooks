@@ -115,7 +115,7 @@ jobs:
     - name: Cache openvino packages
       if: steps.cachepip.outputs.cache-hit != 'true'
       run: |
-        python -m pip install --upgrade pip==21.3.*
+        python -m pip install --upgrade pip
         mkdir pipcache
         python -m pip install --cache-dir pipcache --no-deps openvino openvino-dev nncf
         cp -r pipcache pipcache_openvino
@@ -137,7 +137,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip==21.3.*
+        python -m pip install --upgrade pip
         python -m pip install -r .ci/dev-requirements.txt --cache-dir pipcache
         python -m ipykernel install --user --name openvino_env
 
@@ -179,7 +179,7 @@ jobs:
     # Main notebooks test. Verifies that all notebooks run without errors
     - name: Analysing with nbval
       run: |
-        python -m pytest --nbval -x -k "test_ or notebook_utils" --durations 10 --ignore=notebooks/305-tensorflow-quantization-aware-training --ignore=notebooks/403-action-recognition-webcam  
+        python -m pytest --nbval -x -k "test_ or notebook_utils" --durations 10 --ignore=notebooks/305-tensorflow-quantization-aware-training --ignore=notebooks/403-action-recognition-webcam --ignore=notebooks/102-pytorch-onnx-to-openvino
 
     # Show the cache after running the notebooks
     - name: Show cache
