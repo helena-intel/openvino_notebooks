@@ -20,13 +20,16 @@ import cv2
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
-import openvino.inference_engine
-from async_pipeline import AsyncPipeline
+import openvino.runtime
 from IPython.display import HTML, Image, Markdown, clear_output, display
 from matplotlib.lines import Line2D
-from models import model
-from openvino.inference_engine import IECore
+from openvino.runtime import Core
 from tqdm.notebook import tqdm_notebook
+
+# local imports
+from model_zoo.model_api.adapters import OpenvinoAdapter
+from model_zoo.model_api.models import SegmentationModel
+from model_zoo.model_api.pipelines import AsyncPipeline
 
 
 # ## Files
@@ -521,6 +524,100 @@ def viz_result_image(
 # In[ ]:
 
 
+def sigmoid(x):
+    return np.exp(-np.logaddexp(0, -x))
+
+
+class CustomSegmentationModel(SegmentationModel):
+    def __init__(
+        self,
+        model_adapter,
+        colormap: np.ndarray = None,
+        sigmoid=False,
+        argmax=False,
+        rgb=False,
+        rotate_and_flip=False,
+    ):
+        """
+        Custom Segmentation Model for use with Async Pipeline from OMZ Model API.
+        https://github.com/openvinotoolkit/open_model_zoo/tree/master/demos/common/python/openvino/model_zoo/model_api/models
+
+        To extend for specific models. This demo class works with simple models
+        with one input and output that require only very basic pre- and postprocessing.
+
+        :param model_path: path to IR model .xml file
+        :param colormap: array of shape (num_classes, 3) where colormap[i] contains the RGB color
+            values for class i. Optional for binary segmentation, required for multiclass
+        :param sigmoid: if True, apply sigmoid to model result
+        :param argmax: if True, apply argmax to model result
+        :param rgb: set to True if the model expects RGB images as input
+        """
+        super().__init__(model_adapter)
+
+        self.sigmoid = sigmoid
+        self.argmax = argmax
+        self.rgb = rgb
+        self.rotate_and_flip = rotate_and_flip
+
+        output_shape = self.outputs[self.output_blob_name].shape
+        if colormap is None and output_shape[1] == 1:
+            self.colormap = np.array([[0, 0, 0], [0, 0, 255]])
+        else:
+            self.colormap = colormap
+        if self.colormap is None:
+            raise ValueError("Please provide a colormap for multiclass segmentation")
+
+    def preprocess(self, inputs):
+        """
+        Resize the image to network input dimensions and transpose to
+        network input shape with N,C,H,W layout.
+
+        Images are expected to have dtype np.uint8 and shape (H,W,3) or (H,W)
+        """
+        meta = {}
+        image = inputs
+        meta["frame"] = image
+        if image.shape[:2] != (self.h, self.w):
+            image = cv2.resize(image, (self.w, self.h))
+        if len(image.shape) == 3:
+            input_image = np.expand_dims(np.transpose(image, (2, 0, 1)), 0)
+        else:
+            input_image = np.expand_dims(np.expand_dims(image, 0), 0)
+        return {self.image_blob_name: input_image}, meta
+
+    def postprocess(self, outputs, preprocess_meta, to_rgb=False):
+        """
+        Convert raw network results into a segmentation map with overlay. Returns
+        a BGR image for further processing with OpenCV.
+        """
+        alpha = 0.4
+
+        if preprocess_meta["frame"].shape[-1] == 3:
+            bgr_frame = preprocess_meta["frame"]
+            if self.rgb:
+                # reverse color channels to convert to BGR
+                bgr_frame = bgr_frame[:, :, (2, 1, 0)]
+        else:
+            # Create BGR image by repeating channels in one-channel image
+            bgr_frame = np.repeat(np.expand_dims(preprocess_meta["frame"], -1), 3, 2)
+        res = next(iter(outputs.values())).squeeze()
+        result_mask_ir = sigmoid(res) if self.sigmoid else res
+
+        if self.argmax:
+            result_mask_ir = np.argmax(res, axis=0).astype(np.uint8)
+        else:
+            result_mask_ir = result_mask_ir.round().astype(np.uint8)
+        overlay = segmentation_map_to_overlay(
+            bgr_frame, result_mask_ir, alpha, colormap=self.colormap
+        )
+        if self.rotate_and_flip:
+            overlay = cv2.flip(cv2.rotate(overlay, rotateCode=cv2.ROTATE_90_CLOCKWISE), flipCode=1)
+        return overlay
+
+
+# In[ ]:
+
+
 def showarray(frame: np.ndarray, display_handle=None):
     """
     Display array `frame`. Replace information at `display_handle` with `frame`
@@ -536,16 +633,13 @@ def showarray(frame: np.ndarray, display_handle=None):
     return display_handle
 
 
-def show_live_inference(
-    ie, image_paths: List, model: model.Model, device: str, reader: Optional[Callable] = None
-):
+def show_live_inference(image_paths: List, model, reader: Optional[Callable] = None):
     """
     Do inference of images listed in `image_paths` on `model` on the given `device` and show
     the results in real time in a Jupyter Notebook
 
     :param image_paths: List of image filenames to load
     :param model: Model instance for inference
-    :param device: Name of device to perform inference on. For example: "CPU"
     :param reader: Image reader. Should return a numpy array with image data.
                    If None, cv2.imread will be used, with the cv2.IMREAD_UNCHANGED flag
     """
@@ -553,21 +647,15 @@ def show_live_inference(
     next_frame_id = 0
     next_frame_id_to_show = 0
 
-    input_layer = next(iter(model.net.input_info))
-
     # Create asynchronous pipeline and print time it takes to load the model
     load_start_time = time.perf_counter()
-    pipeline = AsyncPipeline(
-        ie=ie, model=model, plugin_config={}, device=device, max_num_requests=0
-    )
+    pipeline = AsyncPipeline(model)
     load_end_time = time.perf_counter()
 
     # Perform asynchronous inference
     start_time = time.perf_counter()
-
     while next_frame_id < len(image_paths) - 1:
         results = pipeline.get_result(next_frame_id_to_show)
-
         if results:
             # Show next result from async pipeline
             result, meta = results
@@ -580,9 +668,7 @@ def show_live_inference(
                 image = cv2.imread(filename=str(image_path), flags=cv2.IMREAD_UNCHANGED)
             else:
                 image = reader(str(image_path))
-            pipeline.submit_data(
-                inputs={input_layer: image}, id=next_frame_id, meta={"frame": image}
-            )
+            pipeline.submit_data(image, id=next_frame_id, meta={"frame": image})
             del image
             next_frame_id += 1
         else:
@@ -592,7 +678,7 @@ def show_live_inference(
     pipeline.await_all()
 
     # Show all frames that are in the pipeline after all images have been submitted
-    while pipeline.has_completed_request():
+    while len(pipeline.completed_results) > 0:
         results = pipeline.get_result(next_frame_id_to_show)
         if results:
             result, meta = results
@@ -602,10 +688,11 @@ def show_live_inference(
     end_time = time.perf_counter()
     duration = end_time - start_time
     fps = len(image_paths) / duration
-    print(f"Loaded model to {device} in {load_end_time-load_start_time:.2f} seconds.")
+    print(
+        f"Loaded model to {model.model_adapter.device} in {load_end_time-load_start_time:.2f} seconds."
+    )
     print(f"Total time for {next_frame_id} frames: {duration:.2f} seconds, fps:{fps:.2f}")
 
-    del pipeline.exec_net
     del pipeline
 
 
@@ -614,14 +701,18 @@ def show_live_inference(
 # In[ ]:
 
 
-def benchmark_model(model_path: PathLike,
-                    device: str = "CPU",
-                    seconds: int = 60, api: str = "async",
-                    batch: int = 1, 
-                    cache_dir: PathLike = "model_cache"):
+def benchmark_model(
+    model_path: PathLike,
+    device: str = "CPU",
+    seconds: int = 60,
+    api: str = "async",
+    batch: int = 1,
+    cache_dir: PathLike = "model_cache",
+):
     """
     Benchmark model `model_path` with `benchmark_app`. Returns the output of `benchmark_app`
-    without logging info, and information about the device
+    without logging info, and information about the device.
+    This function is designed to run in a Jupyter Notebook.
 
     :param model_path: path to IR model xml file, or ONNX model
     :param device: device to benchmark on. For example, "CPU" or "MULTI:CPU,GPU"
@@ -630,27 +721,38 @@ def benchmark_model(model_path: PathLike,
     :param batch: Batch size
     :param cache_dir: Directory that contains model/kernel cache files
     """
-    ie = IECore()
+    core = Core()
     model_path = Path(model_path)
-    if ("GPU" in device) and ("GPU" not in ie.available_devices):
-        raise ValueError(f"A GPU device is not available. Available devices are: {ie.available_devices}")
+    if ("GPU" in device) and ("GPU" not in core.available_devices):
+        raise ValueError(
+            f"A GPU device is not available. Available devices are: {core.available_devices}"
+        )
     else:
         benchmark_command = f"benchmark_app -m {model_path} -d {device} -t {seconds} -api {api} -b {batch} -cdir {cache_dir}"
-        display(Markdown(f"**Benchmark {model_path.name} with {device} for {seconds} seconds with {api} inference**"));
-        display(Markdown(f"Benchmark command: `{benchmark_command}`"));
+        display(
+            Markdown(
+                f"**Benchmark {model_path.name} with {device} for {seconds} seconds with {api} inference**"
+            )
+        )
+        display(Markdown(f"Benchmark command: `{benchmark_command}`"))
 
         benchmark_output = get_ipython().run_line_magic('sx', '$benchmark_command')
-        benchmark_result = [line for line in benchmark_output
-                            if not (line.startswith(r"[") or line.startswith("  ") or line == "")]
+        benchmark_result = [
+            line
+            for line in benchmark_output
+            if not (line.startswith(r"[") or line.startswith("  ") or line == "")
+        ]
         print("\n".join(benchmark_result))
         print()
         if "MULTI" in device:
             devices = device.replace("MULTI:", "").split(",")
             for single_device in devices:
-                device_name = ie.get_metric(device_name=single_device, metric_name='FULL_DEVICE_NAME')
+                device_name = core.get_property(
+                    device_name=single_device, name="FULL_DEVICE_NAME"
+                )
                 print(f"{single_device} device: {device_name}")
         else:
-            print(f"Device: {ie.get_metric(device_name=device, metric_name='FULL_DEVICE_NAME')}")
+            print(f"Device: {core.get_property(device_name=device, name='FULL_DEVICE_NAME')}")
 
 
 # ## Checks and Alerts
@@ -687,18 +789,18 @@ class DeviceNotFoundAlert(NotebookAlert):
         :return: A formatted alert box with the message that `device` is not available, and a list
                  of devices that are available.
         """
-        ie = IECore()
-        supported_devices = ie.available_devices
+        core = Core()
+        supported_devices = core.available_devices
         self.message = (
             f"Running this cell requires a {device} device, "
             "which is not available on this system. "
         )
         self.alert_class = "warning"
         if len(supported_devices) == 1:
-            self.message += f"The following device is available: {ie.available_devices[0]}"
+            self.message += f"The following device is available: {core.available_devices[0]}"
         else:
             self.message += (
-                "The following devices are available: " f"{', '.join(ie.available_devices)}"
+                "The following devices are available: " f"{', '.join(core.available_devices)}"
             )
         super().__init__(self.message, self.alert_class)
 
@@ -711,8 +813,8 @@ def check_device(device: str) -> bool:
     :return: True if the device is available, False if not. If the device is not available,
              a DeviceNotFoundAlert will be shown.
     """
-    ie = IECore()
-    if device not in ie.available_devices:
+    core = Core()
+    if device not in core.available_devices:
         DeviceNotFoundAlert(device)
         return False
     else:
@@ -727,7 +829,7 @@ def check_openvino_version(version: str) -> bool:
     :return: True if the version is installed, False if not. If the version is not installed,
              an alert message will be shown.
     """
-    installed_version = openvino.inference_engine.get_version()
+    installed_version = openvino.runtime.get_version()
     if version not in installed_version:
         NotebookAlert(
             f"This notebook requires OpenVINO {version}. "
