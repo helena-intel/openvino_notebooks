@@ -669,7 +669,6 @@ def show_live_inference(image_paths: List, model, reader: Optional[Callable] = N
             else:
                 image = reader(str(image_path))
             pipeline.submit_data(image, id=next_frame_id, meta={"frame": image})
-            del image
             next_frame_id += 1
         else:
             # If the pipeline is not ready yet and there are no results: wait
@@ -678,7 +677,7 @@ def show_live_inference(image_paths: List, model, reader: Optional[Callable] = N
     pipeline.await_all()
 
     # Show all frames that are in the pipeline after all images have been submitted
-    while len(pipeline.completed_results) > 0:
+    for next_frame_id_to_show in range(next_frame_id_to_show, next_frame_id):
         results = pipeline.get_result(next_frame_id_to_show)
         if results:
             result, meta = results
