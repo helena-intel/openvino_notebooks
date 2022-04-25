@@ -37,10 +37,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-18.04, ubuntu-20.04, windows-2019]
+        os: [ubuntu-18.04, ubuntu-20.04, windows-2019, macos-11]
         python: [3.6, 3.7, 3.8, 3.9]
         exclude:
         - os: windows-2019
+          python: 3.6
+        - os: macos-11
           python: 3.6
     steps:
 
@@ -181,10 +183,8 @@ jobs:
         jupyter lab notebooks --help
 
     - name: Analysing with nbval
-      if: matrix.python != '3.9'
       run: |
             python -m pytest --nbval -k "test_112 or test_302 or test_305" --durations 10
-
 
     # Show the cache after running the notebooks
     - name: Show cache
