@@ -29,7 +29,7 @@ ppgan==2.1.*
 transformers
 
 # NNCF notebook requirements
-https://github.com/openvinotoolkit/nncf.git@release_v220
+git+https://github.com/openvinotoolkit/nncf.git@release_v220
 tensorflow_datasets==4.2.0
 
 # CT scan training/inference requirements
