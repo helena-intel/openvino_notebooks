@@ -1,9 +1,10 @@
-openvino-dev[tensorflow2]==2022.1.0
+openvino-dev==2022.1.0
 gdown
 pytube
 yaspin
 
 # PyTorch/ONNX notebook requirements
+fastseg
 ipywidgets
 
 torch>=1.5.1,<=1.7.1; sys_platform == 'darwin'
@@ -13,11 +14,22 @@ torch>=1.5.1+cpu,<=1.7.1+cpu; sys_platform =='linux' or platform_system == 'Wind
 torchvision>=0.6.1+cpu,<=0.8.2+cpu; sys_platform =='linux' or platform_system == 'Windows'
 torchmetrics==0.6.2
 
+# Replace by adding tf as a dependency for nncf when merging to main branch
+tensorflow==2.4.*; python_version <= '3.8'
+tensorflow==2.5.*; python_version == '3.9'
+
+# PaddlePaddle notebook requirements
+# For 103 PaddlePaddle MO conversion tutorial and 206 PaddleGAN/AnimeGAN demo
+paddlepaddle==2.2.*
+paddlehub
+paddle2onnx>=0.6
+ppgan==2.1.*
+
 # BERT quantization notebook requirements
 transformers
 
 # NNCF notebook requirements
-nncf-2.2.0-py3-none-any.whl
+https://github.com/openvinotoolkit/nncf.git@release_v220
 tensorflow_datasets==4.2.0
 
 # CT scan training/inference requirements
@@ -30,6 +42,7 @@ jupyterlab
 # The packages below are not directly required. They are dependencies of 
 # other dependencies that are pinned to a specific version to avoid
 # compatibility issues or vulnerabilities
+geffnet==0.9.8
 matplotlib<3.4
 jedi==0.17.2
 setuptools>=56.0.0
